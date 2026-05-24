@@ -93,12 +93,34 @@ class Options {
 }
 
 abstract class ToolSet {
+	protected final boolean disablePermissionChecks;
+	protected final Scanner scanner;
+
+	public ToolSet(boolean disablePermissionChecks, Scanner scanner) {
+		this.disablePermissionChecks = disablePermissionChecks;
+		this.scanner = scanner;
+	}
+
+	protected boolean confirmAction(String toolName, String description) {
+		if (disablePermissionChecks) {
+			return true;
+		}
+
+		System.out.printf("[CONFIRM] %s: %s (y/n)? ", toolName, description);
+		var response = scanner.nextLine().trim().toLowerCase();
+		return response.equals("y") || response.equals("yes");
+	}
+
 	@Tool("Get the name of the current tool set that the agent can use.")
 	public abstract String getToolSetName();
 }
 
 class FileBrowsingTools extends ToolSet {
 	private static final Logger LOG = LoggerFactory.getLogger(FileBrowsingTools.class);
+
+	public FileBrowsingTools(boolean disablePermissionChecks, Scanner scanner) {
+		super(disablePermissionChecks, scanner);
+	}
 
 	@Tool("Get the current working directory.")
 	public Path getCwd() {
@@ -181,6 +203,10 @@ class FileBrowsingTools extends ToolSet {
 
 	@Tool("Write an entire file.")
 	public void writeEntireFile(String file, String content) throws IOException {
+		if (!confirmAction("writeEntireFile", "Write file: " + file)) {
+			return;
+		}
+
 		LOG.info("Writing entire file {}", file);
 		Files.writeString(Path.of(file), content);
 	}
@@ -194,8 +220,16 @@ class FileBrowsingTools extends ToolSet {
 class ShellCommandTools extends ToolSet {
 	private static final Logger LOG = LoggerFactory.getLogger(ShellCommandTools.class);
 
+	public ShellCommandTools(boolean disablePermissionChecks, Scanner scanner) {
+		super(disablePermissionChecks, scanner);
+	}
+
 	@Tool("Execute a shell command.")
 	public String execShellCmd(String... cmd) throws IOException {
+		if (!confirmAction("execShellCmd", "Execute command: " + String.join(" ", cmd))) {
+			return null;
+		}
+
 		LOG.info("Running shell command {}", Arrays.toString(cmd));
 		var process = new ProcessBuilder(cmd)
 			.redirectErrorStream(true)
@@ -206,6 +240,10 @@ class ShellCommandTools extends ToolSet {
 
 	@Tool("Create one or more new directories.")
 	public void createDirs(String... dirs) throws IOException {
+		if (!confirmAction("createDirs", "Create directories: " + String.join(", ", dirs))) {
+			return;
+		}
+
 		LOG.info("Creating directories {}", (Object) dirs);
 		for (String dir : dirs) {
 			Files.createDirectories(Path.of(dir));
@@ -214,6 +252,10 @@ class ShellCommandTools extends ToolSet {
 
 	@Tool("Initialize a Git repository.")
 	public void initRepo(String origin, boolean woke) throws IOException {
+		if (!confirmAction("initRepo", "Initialize git repository with origin: " + origin)) {
+			return;
+		}
+
 		LOG.info("Initializing git repository with origin {} and branch {}",
 			origin, woke ? "main" : "master");
 		execShellCmd("git", "init");
@@ -237,6 +279,10 @@ class ShellCommandTools extends ToolSet {
 
 	@Tool("Add, commit, and push changes to Git.")
 	public void commit(String msg) throws IOException {
+		if (!confirmAction("commit", "Commit and push changes: " + msg)) {
+			return;
+		}
+
 		LOG.info("Publishing changes");
 		execShellCmd("git", "add", ".");
 		execShellCmd("git", "commit", "-m", msg);
@@ -253,7 +299,9 @@ class WebBrowsingTools extends ToolSet {
 	private final WebDriver driver;
 	private static final Logger LOG = LoggerFactory.getLogger(WebBrowsingTools.class);
 
-	public WebBrowsingTools(WebDriver driver) {
+	// the scanner is not actually used here because nothing is dangerous
+	public WebBrowsingTools(WebDriver driver, boolean disablePermissionChecks, Scanner scanner) {
+		super(disablePermissionChecks, scanner);
 		this.driver = driver;
 	}
 
@@ -373,10 +421,10 @@ class JAgent {
 		return new FirefoxDriver(options);
 	}
 
-	private static Assistant initAgent(ChatModel model, ChatMemoryProvider memory, WebDriver browser) {
-		var fileTools = new FileBrowsingTools();
-		var shellTools = new ShellCommandTools();
-		var webTools = new WebBrowsingTools(browser);
+	private static Assistant initAgent(ChatModel model, ChatMemoryProvider memory, WebDriver browser, boolean disablePermissionChecks, Scanner scanner) {
+		var fileTools = new FileBrowsingTools(disablePermissionChecks, scanner);
+		var shellTools = new ShellCommandTools(disablePermissionChecks, scanner);
+		var webTools = new WebBrowsingTools(browser, disablePermissionChecks, scanner);
 		
 		return AiServices.builder(Assistant.class)
 			.chatModel(model)
@@ -489,7 +537,7 @@ class JAgent {
 
 			var model = initModel(apiKey);
 			var memory = initMemory(200);
-			var agent = initAgent(model, memory, browser);
+			var agent = initAgent(model, memory, browser, options.DISABLE_PERMISSION_CHECKS, scanner);
 
 			displayBoxedMessage("Welcome to JAgent!");
 			var sessionId = UUID.randomUUID().toString();
