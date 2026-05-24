@@ -69,7 +69,6 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
-import picocli.CommandLine.Parameters;
 
 /*
  * jagent is a free ai coding tool
@@ -88,7 +87,10 @@ class Options {
 	@Option(names = {"-i", "--init"}, description = "Initialize a fresh configuration file.")
 	public transient boolean CREATE_CONFIG_FILE;
 
-	@Parameters(description = "List of files to work on.")
+	@Option(names = {"-p", "--prompt"}, description = "The prompt to use for the AI.", arity = "1")
+	public transient String PROMPT;
+
+	@Option(names = {"-f", "--files"}, description = "List of files to work on.", arity = "1..*")
 	public transient File[] FILES;
 }
 
@@ -421,7 +423,8 @@ class JAgent {
 		return new FirefoxDriver(options);
 	}
 
-	private static Assistant initAgent(ChatModel model, ChatMemoryProvider memory, WebDriver browser, boolean disablePermissionChecks, Scanner scanner) {
+	private static Assistant initAgent(ChatModel model, ChatMemoryProvider memory,
+		WebDriver browser, boolean disablePermissionChecks, Scanner scanner) {
 		var fileTools = new FileBrowsingTools(disablePermissionChecks, scanner);
 		var shellTools = new ShellCommandTools(disablePermissionChecks, scanner);
 		var webTools = new WebBrowsingTools(browser, disablePermissionChecks, scanner);
@@ -482,9 +485,11 @@ class JAgent {
 				logAndExit("Created config file at " + config, true);
 			}
 
-			if (Files.exists(config)) {
+			// load api key from config if not provided
+			if (options.MISTRAL_API_KEY == null && Files.exists(config)) {
 				var json = Files.readString(config);
-				return gson.fromJson(json, Options.class);
+				var configOptions = gson.fromJson(json, Options.class);
+				options.MISTRAL_API_KEY = configOptions.MISTRAL_API_KEY;
 			}
 		} catch (IOException e) {
 			logAndExit("Failed to handle config: " + e.getMessage(), false);
@@ -506,6 +511,34 @@ class JAgent {
 			return true;
 		}
 		return false;
+	}
+
+	private static String buildFileContext(File[] files) {
+		if (files == null || files.length == 0) {
+			return "";
+		}
+
+		var fileContext = new StringBuilder();
+		fileContext.append("The following files have been provided for context:\n\n");
+		for (File file : files) {
+			try {
+				var content = Files.readString(file.toPath());
+				fileContext.append("--- File: ").append(file.getPath()).append(" ---\n");
+				fileContext.append(content).append("\n\n");
+			} catch (IOException e) {
+				LOG.warn("Failed to read file {}: {}", file.getPath(), e.getMessage());
+			}
+		}
+		return fileContext.toString();
+	}
+
+	private static void handleOneShot(Assistant agent, String sessionId, String prompt,
+		String fileContext, WebDriver browser) {
+		var message = fileContext.isEmpty() ? prompt : fileContext + prompt;
+		var response = agent.chat(sessionId, message);
+		System.out.println(response);
+		browser.quit();
+		logAndExit("Exiting...", true);
 	}
 
 	private static void displayBoxedMessage(String message) {
@@ -539,8 +572,16 @@ class JAgent {
 			var memory = initMemory(200);
 			var agent = initAgent(model, memory, browser, options.DISABLE_PERMISSION_CHECKS, scanner);
 
-			displayBoxedMessage("Welcome to JAgent!");
 			var sessionId = UUID.randomUUID().toString();
+			var fileContext = buildFileContext(options.FILES);
+
+			// oneshot mode
+			if (options.PROMPT != null) {
+				handleOneShot(agent, sessionId, options.PROMPT, fileContext, browser);
+			}
+
+			// interactive mode
+			displayBoxedMessage("Welcome to JAgent!");
 
 			while (true) {
 				var message = scanningUtil.scan("jagent > ");
@@ -552,7 +593,8 @@ class JAgent {
 					case "/clear" -> System.out.print("\033[H\033[2J");
 					case "" -> System.out.println("Please enter a message.");
 					default -> {
-						var response = agent.chat(sessionId, message);
+						var fullMessage = fileContext.isEmpty() ? message : fileContext + message;
+						var response = agent.chat(sessionId, fullMessage);
 						System.out.println(response);
 					}
 				}
