@@ -347,9 +347,8 @@ class WebBrowsingTools extends ToolSet {
 
 interface Assistant {
 	@SystemMessage("""
-		From now on, you're in the role of an advanced AI coding assistant. 
+		From now on, you're in the role of an advanced AI coding assistant called JAgent.
 		Explain your work in a few short sentences in a way that would make sense to a non-technical user.
-		NEVER use any Markdown in your responses. ALWAYS format your responses as plain text without any special headings or bolding.
 	""")
 	String chat(@MemoryId String chatId, @UserMessage String message);
 }
@@ -549,6 +548,30 @@ class JAgent {
 		System.out.println(top + middle + bottom);
 	}
 
+	// https://glaforge.dev/posts/2025/02/27/pretty-print-markdown-on-the-console
+	private static String markdown(String md) {
+		var replacements = new HashMap<String, String>() {{
+			put("\\*\\*(.*?)\\*\\*",            "\u001B[1m$1\u001B[0m");
+			put("\\*(.*?)\\*",                  "\u001B[3m$1\u001B[0m");
+			put("__(.*?)__",                    "\u001B[4m$1\u001B[0m");
+			put("~~(.*?)~~",                    "\u001B[9m$1\u001B[0m");
+			put("(> ?.*)",                      "\u001B[3m\u001B[34m\u001B[1m$1\u001B[22m\u001B[0m");
+			put("([\\d]+\\.|-|\\*) (.*)",       "\u001B[35m\u001B[1m$1\u001B[22m\u001B[0m $2");
+			put("(?s)```(\\w+)?\\n(.*?)\\n```", "\u001B[3m\u001B[1m$1\u001B[22m\u001B[0m\n\u001B[57;107m$2\u001B[0m\n");
+			put("`(.*?)`",                      "\u001B[57;107m$1\u001B[0m");
+			put("(#{1,6}) (.*?)\n",             "\u001B[36m\u001B[1m$1 $2\u001B[22m\u001B[0m\n");
+			put("(.*?\n={2,}\n)",               "\u001B[36m\u001B[1m$1\u001B[22m\u001B[0m\n");
+			put("(.*?\n-{2,}\n)",               "\u001B[36m\u001B[1m$1\u001B[22m\u001B[0m\n");
+			put("!\\[(.*?)]\\((.*?)\\)",        "\u001B[34m$1\u001B[0m (\u001B[34m\u001B[4m$2\u001B[0m)");
+			put("!?\\[(.*?)]\\((.*?)\\)",       "\u001B[34m$1\u001B[0m (\u001B[34m\u001B[4m$2\u001B[0m]");
+		}};
+
+		for (var entry : replacements.entrySet()) {
+			md = md.replaceAll(entry.getKey(), entry.getValue());
+		}
+		return md;
+	}
+
 	public static void main(String[] args) {
 		var options = parseOptions(args);
 		var configPath = getConfigPath();
@@ -595,7 +618,7 @@ class JAgent {
 					default -> {
 						var fullMessage = fileContext.isEmpty() ? message : fileContext + message;
 						var response = agent.chat(sessionId, fullMessage);
-						System.out.println(response);
+						System.out.println(markdown(response));
 					}
 				}
 			}
