@@ -347,7 +347,7 @@ interface Assistant {
 	@SystemMessage("""
 		From now on, you're in the role of an advanced AI coding assistant. 
 		Explain your work in a few short sentences in a way that would make sense to a non-technical user.
-		NEVER use any Markdown in your responses.
+		NEVER use any Markdown in your responses. ALWAYS format your responses as plain text without any special headings or bolding.
 	""")
 	String chat(@MemoryId String chatId, @UserMessage String message);
 }
