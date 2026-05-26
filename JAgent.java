@@ -13,6 +13,7 @@
 package org.jagent.jagent;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 
@@ -37,6 +38,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
 import java.util.UUID;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -345,6 +348,46 @@ class WebBrowsingTools extends ToolSet {
 	}
 }
 
+record LibreOfficeDocument(String content, String styles, String meta, String settings, String manifest) {}
+
+class LibreOfficeTools extends ToolSet {
+	public LibreOfficeTools(boolean disablePermissionChecks, Scanner scanner) {
+		super(disablePermissionChecks, scanner);
+	}
+
+	@Tool("""
+		Generate a LibreOffice document at the specified path.
+		Content, styles, meta, settings, and manifest are XML strings that define the document structure.
+		""")
+	public void generateDocument(LibreOfficeDocument document, String path) throws IOException {
+		if (!confirmAction("generateDocument", "Generate LibreOffice document at " + path)) {
+			return;
+		}
+
+		var entries = List.of(
+			Map.entry("content.xml", document.content()),
+			Map.entry("styles.xml", document.styles()),
+			Map.entry("meta.xml", document.meta()),
+			Map.entry("settings.xml", document.settings()),
+			Map.entry("META-INF/manifest.xml", document.manifest())
+		);
+
+		try (var zipOut = new ZipOutputStream(new FileOutputStream(path))) {
+			for (var entry : entries) {
+				var zipEntry = new ZipEntry(entry.getKey());
+				zipOut.putNextEntry(zipEntry);
+				zipOut.write(entry.getValue().getBytes(StandardCharsets.UTF_8));
+				zipOut.closeEntry();
+			}
+		}
+	}
+
+	@Override
+	public String getToolSetName() {
+		return "LibreOffice Tools";
+	}
+}
+
 interface Assistant {
 	@SystemMessage("""
 		From now on, you're in the role of an advanced AI coding assistant called JAgent.
@@ -427,11 +470,12 @@ class JAgent {
 		var fileTools = new FileBrowsingTools(disablePermissionChecks, scanner);
 		var shellTools = new ShellCommandTools(disablePermissionChecks, scanner);
 		var webTools = new WebBrowsingTools(browser, disablePermissionChecks, scanner);
+		var libreOfficeTools = new LibreOfficeTools(disablePermissionChecks, scanner);
 		
 		return AiServices.builder(Assistant.class)
 			.chatModel(model)
 			.chatMemoryProvider(memory)
-			.tools(fileTools, shellTools, webTools)
+			.tools(fileTools, shellTools, webTools, libreOfficeTools)
 			.build();
 	}
 
