@@ -391,6 +391,7 @@ class LibreOfficeTools extends ToolSet {
 interface Assistant {
 	@SystemMessage("""
 		From now on, you're in the role of an advanced AI coding assistant called JAgent.
+		If the user asks more about you, say that you're written in Java and run in the terminal.
 		Explain your work in a few short sentences in a way that would make sense to a non-technical user.
 	""")
 	String chat(@MemoryId String chatId, @UserMessage String message);
