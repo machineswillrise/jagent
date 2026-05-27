@@ -658,6 +658,27 @@ class JAgent {
 		System.out.println(top + middle + bottom);
 	}
 
+	private static void runInteractiveLoop(ScanningUtil scanningUtil, WebDriver browser,
+		Assistant agent, String sessionId, String fileContext) throws InterruptedException {
+		while (true) {
+			var message = scanningUtil.scan("jagent > ");
+			switch (message) {
+				case "/exit" -> {
+					browser.quit();
+					logAndExit("Exiting...", true);
+				}
+				case "/clear" -> System.out.print(CLEAR_SCREEN);
+				case "" -> System.out.println("Please enter a message.");
+				default -> {
+					var fullMessage = fileContext.isEmpty() ? message : fileContext + message;
+					var tokenStream = agent.chat(sessionId, fullMessage);
+
+					streamResponse(tokenStream, () -> {});
+				}
+			}
+		}
+	}
+
 	public static void main(String[] args) {
 		var options = parseOptions(args);
 		var configPath = getConfigPath();
@@ -691,24 +712,7 @@ class JAgent {
 
 			// interactive mode
 			displayBoxedMessage("Welcome to JAgent!");
-
-			while (true) {
-				var message = scanningUtil.scan("jagent > ");
-				switch (message) {
-					case "/exit" -> {
-						browser.quit();
-						logAndExit("Exiting...", true);
-					}
-					case "/clear" -> System.out.print(CLEAR_SCREEN);
-					case "" -> System.out.println("Please enter a message.");
-					default -> {
-						var fullMessage = fileContext.isEmpty() ? message : fileContext + message;
-						var tokenStream = agent.chat(sessionId, fullMessage);
-
-						streamResponse(tokenStream, () -> {});
-					}
-				}
-			}
+			runInteractiveLoop(scanningUtil, browser, agent, sessionId, fileContext);
 		} catch (Exception e) {
 			System.err.println(e.getMessage());
 		}
