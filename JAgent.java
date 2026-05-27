@@ -442,6 +442,7 @@ class ScanningUtil implements AutoCloseable {
 
 class JAgent {
 	private static final Logger LOG = LoggerFactory.getLogger(JAgent.class);
+	private static final String CLEAR_SCREEN = "\033[H\033[2J";
 
 	private static Gson initGson() {
 		return new GsonBuilder()
@@ -610,13 +611,17 @@ class JAgent {
 	private static void streamResponse(TokenStream tokenStream, Runnable onComplete)
 		throws InterruptedException {
 		var futureResponse = new CompletableFuture<Void>();
+		var fullResponse = new StringBuilder();
 
 		tokenStream
 			.onPartialResponse(partialResponse -> {
 				System.out.print(partialResponse);
+				fullResponse.append(partialResponse);
 			})
 			.onCompleteResponse(response -> {
-				System.out.print("\n\n");
+				System.out.print(CLEAR_SCREEN);
+				prettyPrint(fullResponse.toString());
+
 				onComplete.run();
 				futureResponse.complete(null);
 			})
@@ -694,7 +699,7 @@ class JAgent {
 						browser.quit();
 						logAndExit("Exiting...", true);
 					}
-					case "/clear" -> System.out.print("\033[H\033[2J");
+					case "/clear" -> System.out.print(CLEAR_SCREEN);
 					case "" -> System.out.println("Please enter a message.");
 					default -> {
 						var fullMessage = fileContext.isEmpty() ? message : fileContext + message;
