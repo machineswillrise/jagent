@@ -38,6 +38,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -52,12 +54,13 @@ import dev.langchain4j.agent.tool.Tool;
 import dev.langchain4j.service.AiServices;
 import dev.langchain4j.memory.chat.ChatMemoryProvider;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
-import dev.langchain4j.model.chat.ChatModel;
-import dev.langchain4j.model.mistralai.MistralAiChatModel;
+import dev.langchain4j.model.chat.StreamingChatModel;
+import dev.langchain4j.model.mistralai.MistralAiStreamingChatModel;
 import dev.langchain4j.model.mistralai.MistralAiChatModelName;
 import dev.langchain4j.service.MemoryId;
 import dev.langchain4j.service.UserMessage;
 import dev.langchain4j.service.SystemMessage;
+import dev.langchain4j.service.TokenStream;
 
 import org.openqa.selenium.By;
 import org.openqa.selenium.firefox.FirefoxDriver;
@@ -394,7 +397,7 @@ interface Assistant {
 		If the user asks more about you, say that you're written in Java and run in the terminal.
 		Explain your work in a few short sentences in a way that would make sense to a non-technical user.
 	""")
-	String chat(@MemoryId String chatId, @UserMessage String message);
+	TokenStream chat(@MemoryId String chatId, @UserMessage String message);
 }
 
 // getting the terminal size through jline didn't seem to work properly
@@ -446,8 +449,8 @@ class JAgent {
 			.create();
 	}
 
-	private static MistralAiChatModel initModel(String apiKey) {
-		return MistralAiChatModel.builder()
+	private static MistralAiStreamingChatModel initModel(String apiKey) {
+		return MistralAiStreamingChatModel.builder()
 			.apiKey(apiKey)
 			.modelName(MistralAiChatModelName.MISTRAL_LARGE_LATEST)
 			.build();
@@ -466,15 +469,15 @@ class JAgent {
 		return new FirefoxDriver(options);
 	}
 
-	private static Assistant initAgent(ChatModel model, ChatMemoryProvider memory,
+	private static Assistant initAgent(StreamingChatModel model, ChatMemoryProvider memory,
 		WebDriver browser, boolean disablePermissionChecks, Scanner scanner) {
 		var fileTools = new FileBrowsingTools(disablePermissionChecks, scanner);
 		var shellTools = new ShellCommandTools(disablePermissionChecks, scanner);
 		var webTools = new WebBrowsingTools(browser, disablePermissionChecks, scanner);
 		var libreOfficeTools = new LibreOfficeTools(disablePermissionChecks, scanner);
-		
+
 		return AiServices.builder(Assistant.class)
-			.chatModel(model)
+			.streamingChatModel(model)
 			.chatMemoryProvider(memory)
 			.tools(fileTools, shellTools, webTools, libreOfficeTools)
 			.build();
@@ -604,14 +607,42 @@ class JAgent {
 		System.out.println(markdown(md));
 	}
 
-	private static void handleOneShot(Assistant agent, String sessionId, String prompt,
-		String fileContext, WebDriver browser) {
-		var message = fileContext.isEmpty() ? prompt : fileContext + prompt;
-		var response = agent.chat(sessionId, message);
+	private static void streamResponse(TokenStream tokenStream, Runnable onComplete)
+		throws InterruptedException {
+		var futureResponse = new CompletableFuture<Void>();
 
-		prettyPrint(response);
-		browser.quit();
-		logAndExit("Exiting...", true);
+		tokenStream
+			.onPartialResponse(partialResponse -> {
+				System.out.print(partialResponse);
+			})
+			.onCompleteResponse(response -> {
+				System.out.print("\n\n");
+				onComplete.run();
+				futureResponse.complete(null);
+			})
+			.onError(error -> {
+				System.err.println("Error: " + error.getMessage());
+				futureResponse.completeExceptionally(error);
+			})
+			.start();
+
+		try {
+			futureResponse.get();
+		} catch (ExecutionException e) {
+			// error already handled in onError callback
+		}
+	}
+
+	private static void handleOneShot(Assistant agent, String sessionId, String prompt,
+		String fileContext, WebDriver browser) throws InterruptedException {
+		var message = fileContext.isEmpty() ? prompt : fileContext + prompt;
+		var tokenStream = agent.chat(sessionId, message);
+
+		streamResponse(tokenStream,
+			() -> {
+				browser.quit();
+				logAndExit("Exiting...", true);
+			});
 	}
 
 	private static void displayBoxedMessage(String message) {
@@ -667,8 +698,9 @@ class JAgent {
 					case "" -> System.out.println("Please enter a message.");
 					default -> {
 						var fullMessage = fileContext.isEmpty() ? message : fileContext + message;
-						var response = agent.chat(sessionId, fullMessage);
-						prettyPrint(response);
+						var tokenStream = agent.chat(sessionId, fullMessage);
+
+						streamResponse(tokenStream, () -> {});
 					}
 				}
 			}
