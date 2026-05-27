@@ -576,23 +576,6 @@ class JAgent {
 		return fileContext.toString();
 	}
 
-	private static void handleOneShot(Assistant agent, String sessionId, String prompt,
-		String fileContext, WebDriver browser) {
-		var message = fileContext.isEmpty() ? prompt : fileContext + prompt;
-		var response = agent.chat(sessionId, message);
-		System.out.println(response);
-		browser.quit();
-		logAndExit("Exiting...", true);
-	}
-
-	private static void displayBoxedMessage(String message) {
-		var padding = "─".repeat(message.length() + 2);
-		var top     = "┌"  + padding +  "┐" + "\n";
-		var middle  = "│ " + message + " │" + "\n";
-		var bottom  = "└"  + padding +  "┘";
-		System.out.println(top + middle + bottom);
-	}
-
 	// https://glaforge.dev/posts/2025/02/27/pretty-print-markdown-on-the-console
 	private static String markdown(String md) {
 		var replacements = new HashMap<String, String>() {{
@@ -615,6 +598,28 @@ class JAgent {
 			md = md.replaceAll(entry.getKey(), entry.getValue());
 		}
 		return md;
+	}
+
+	private static void prettyPrint(String md) {
+		System.out.println(markdown(md));
+	}
+
+	private static void handleOneShot(Assistant agent, String sessionId, String prompt,
+		String fileContext, WebDriver browser) {
+		var message = fileContext.isEmpty() ? prompt : fileContext + prompt;
+		var response = agent.chat(sessionId, message);
+
+		prettyPrint(response);
+		browser.quit();
+		logAndExit("Exiting...", true);
+	}
+
+	private static void displayBoxedMessage(String message) {
+		var padding = "─".repeat(message.length() + 2);
+		var top     = "┌"  + padding +  "┐" + "\n";
+		var middle  = "│ " + message + " │" + "\n";
+		var bottom  = "└"  + padding +  "┘";
+		System.out.println(top + middle + bottom);
 	}
 
 	public static void main(String[] args) {
@@ -663,7 +668,7 @@ class JAgent {
 					default -> {
 						var fullMessage = fileContext.isEmpty() ? message : fileContext + message;
 						var response = agent.chat(sessionId, fullMessage);
-						System.out.println(markdown(response));
+						prettyPrint(response);
 					}
 				}
 			}
