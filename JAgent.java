@@ -123,8 +123,24 @@ abstract class ToolSet {
 	public abstract String getToolSetName();
 }
 
+class PermissionDeniedException extends RuntimeException {
+	public PermissionDeniedException(String message) {
+		super(message);
+	}
+}
+
 class FileBrowsingTools extends ToolSet {
 	private static final Logger LOG = LoggerFactory.getLogger(FileBrowsingTools.class);
+	private static final List<String> SECRETS = Arrays.asList(
+		".env",
+		".git",
+		"node_modules",
+		"dist",
+		"build",
+		"target", // maven or cargo
+		"bin",
+		".go-build"
+	);
 
 	public FileBrowsingTools(boolean disablePermissionChecks, Scanner scanner) {
 		super(disablePermissionChecks, scanner);
@@ -136,14 +152,22 @@ class FileBrowsingTools extends ToolSet {
 		return Path.of(System.getProperty("user.dir"));
 	}
 
+	private static void checkPermission(String file) {
+		if (SECRETS.contains(file)) {
+			LOG.warn("Access to {} is not allowed", file);
+			throw new PermissionDeniedException("Access to " + file + " is not allowed");
+		}
+	}
+
 	@Tool("List the files in a directory.")
 	public List<Path> listFiles(String dir) throws IOException {
 		LOG.info("Listing files in {}", dir);
+		checkPermission(dir);
 		return Files.list(Path.of(dir))
 			.collect(Collectors.toList());
 	}
 
-	private List<Path> walkFiles(String dir, List<Path> ignore) throws IOException {
+	private List<Path> walkFiles(String dir, List<String> ignore) throws IOException {
 		LOG.info("Walking files in {}, ignoring {}", dir, ignore);
 		var result = new ArrayList<Path>();
 
@@ -169,28 +193,23 @@ class FileBrowsingTools extends ToolSet {
 	@Tool("Walk through the files in a directory, ignoring secrets, commit history, and build output.")
 	public List<Path> walkFilesNoSecrets(String dir) throws IOException {
 		LOG.info("Walking files in {}, ignoring secrets", dir);
-		return walkFiles(dir, Arrays.asList(
-			Path.of(".env"),
-			Path.of(".git"),
-			Path.of("node_modules"),
-			Path.of("dist"),
-			Path.of("build"),
-			Path.of("target"), // maven or cargo
-			Path.of("bin"),
-			Path.of(".go-build")
-		));
+		checkPermission(dir);
+		return walkFiles(dir, SECRETS);
+	}
+
+
+	@Tool("Get the size of a file.")
+	public long getFileSize(String file) throws IOException {
+		LOG.info("Getting size of {}", file);
+		checkPermission(file);
+		return Files.size(Path.of(file));
 	}
 
 	@Tool("Read an entire file.")
 	public String readEntireFile(String file) throws IOException {
 		LOG.info("Reading file {}", file);
+		checkPermission(file);
 		return Files.readString(Path.of(file));
-	}
-
-	@Tool("Get the size of a file.")
-	public long getFileSize(String file) throws IOException {
-		LOG.info("Getting size of {}", file);
-		return Files.size(Path.of(file));
 	}
 
 	@Tool("Read a file with a specified offset and limit.")
@@ -216,6 +235,7 @@ class FileBrowsingTools extends ToolSet {
 		}
 
 		LOG.info("Writing entire file {}", file);
+		checkPermission(file);
 		Files.writeString(Path.of(file), content);
 	}
 
