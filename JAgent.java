@@ -213,6 +213,7 @@ class FileBrowsingTools extends ToolSet {
 	@Tool("Read a file with a specified offset and limit.")
 	public String readPartialFile(String file, int offset, int limit) throws IOException {
 		LOG.info("Reading partial file {} with offset {} and limit {}", file, offset, limit);
+		checkPermission(file);
 		try (var raf = new RandomAccessFile(Path.of(file).toFile(), "r")) {
 			raf.seek(offset);
 			var buf = new byte[limit];
