@@ -10,8 +10,6 @@
 //DEPS org.seleniumhq.selenium:selenium-java:4.43.0
 //DEPS org.slf4j:slf4j-api:2.0.17
 
-package org.jagent.jagent;
-
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
