@@ -41,6 +41,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
+import java.time.Duration;
+
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
@@ -482,6 +484,9 @@ class JAgent {
 		return MistralAiStreamingChatModel.builder()
 			.apiKey(apiKey)
 			.modelName(MistralAiChatModelName.MISTRAL_LARGE_LATEST)
+			// sometimes it takes a while to generate documents and
+			// it throws a HttpTimeoutException
+			.timeout(Duration.ofSeconds(90))
 			.build();
 	}
 
