@@ -150,7 +150,7 @@ class FileBrowsingTools extends ToolSet {
 		return Path.of(System.getProperty("user.dir"));
 	}
 
-	private static void checkPermission(String file) {
+	private void checkPermission(String file) {
 		if (SECRETS.contains(file)) {
 			LOG.warn("Access to {} is not allowed", file);
 			throw new PermissionDeniedException("Access to " + file + " is not allowed");
