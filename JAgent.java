@@ -426,6 +426,8 @@ interface Assistant {
 		Some build-related directories are blacklisted too but it's mainly to avoid polluting your context window.
 
 		You can access the Internet using a headless Firefox browser if you need to.
+		All tool calls have confirmations unless you are running in dangerous mode where they will be disabled.
+		Running JAgent in dangerous mode is not recommended, but supported.
 	""")
 	TokenStream chat(@MemoryId String chatId, @UserMessage String message);
 }
