@@ -372,6 +372,24 @@ class WebBrowsingTools extends ToolSet {
 	}
 }
 
+class MiscTools extends ToolSet {
+	public MiscTools(boolean disablePermissionChecks, Scanner scanner) {
+		super(disablePermissionChecks, scanner);
+	}
+
+	@Tool("Ask the user a question.")
+	public String askQuestion(String question) {
+		System.out.println(question);
+		System.out.print("Enter your answer: ");
+		return scanner.nextLine();
+	}
+
+	@Override
+	public String getToolSetName() {
+		return "Misc Tools";
+	}
+}
+
 record LibreOfficeDocument(String content, String styles, String meta, String settings, String manifest) {}
 
 class LibreOfficeTools extends ToolSet {
@@ -515,12 +533,13 @@ class JAgent {
 		var fileTools = new FileBrowsingTools(disablePermissionChecks, scanner);
 		var shellTools = new ShellCommandTools(disablePermissionChecks, scanner);
 		var webTools = new WebBrowsingTools(browser, disablePermissionChecks, scanner);
+		var miscTools = new MiscTools(disablePermissionChecks, scanner);
 		var libreOfficeTools = new LibreOfficeTools(disablePermissionChecks, scanner);
 
 		return AiServices.builder(Assistant.class)
 			.streamingChatModel(model)
 			.chatMemoryProvider(memory)
-			.tools(fileTools, shellTools, webTools, libreOfficeTools)
+			.tools(fileTools, shellTools, webTools, miscTools, libreOfficeTools)
 			.build();
 	}
 
