@@ -4,6 +4,7 @@
 //DEPS com.google.code.gson:gson:2.14.0
 //DEPS dev.langchain4j:langchain4j:1.14.1
 //DEPS dev.langchain4j:langchain4j-mistral-ai:1.14.1
+//DEPS dev.langchain4j:langchain4j-open-ai:1.14.1
 //DEPS info.picocli:picocli:4.7.7
 //DEPS io.jstach.rainbowgum:rainbowgum:0.8.2
 //DEPS net.java.dev.jna:jna:5.18.1
@@ -51,16 +52,17 @@ import com.sun.jna.Native;
 import com.sun.jna.Structure;
 
 import dev.langchain4j.agent.tool.Tool;
-import dev.langchain4j.service.AiServices;
 import dev.langchain4j.memory.chat.ChatMemoryProvider;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.model.chat.StreamingChatModel;
-import dev.langchain4j.model.mistralai.MistralAiStreamingChatModel;
 import dev.langchain4j.model.mistralai.MistralAiChatModelName;
+import dev.langchain4j.model.mistralai.MistralAiStreamingChatModel;
+import dev.langchain4j.model.openai.OpenAiStreamingChatModel;
+import dev.langchain4j.service.AiServices;
 import dev.langchain4j.service.MemoryId;
-import dev.langchain4j.service.UserMessage;
 import dev.langchain4j.service.SystemMessage;
 import dev.langchain4j.service.TokenStream;
+import dev.langchain4j.service.UserMessage;
 
 import org.openqa.selenium.By;
 import org.openqa.selenium.firefox.FirefoxDriver;
@@ -77,11 +79,11 @@ import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
 /*
- * jagent is a free ai coding tool
- * to use it, you need a free mistral api key (you have to agree to training)
- * you can get one if you go to the admin dashboard and verify with a phone number
+ * JAgent is a free AI coding agent written in Java.
+ * It can either use the Mistral API or use the OpenCode API for free by sending the
+ * 'Authorization: Bearer public' header. The free Mistral AI is smarter but can do
+ * rate-limiting more than OpenCode so you'll have a better experience with a paid version.
  */
-
 @Command(name = "jagent", mixinStandardHelpOptions = true, version = "1.0")
 class Options {
 	@Option(names = {"-d", "--dangerous"}, description = "Disable permission checks for tool calls.")
@@ -432,11 +434,10 @@ class LibreOfficeTools extends ToolSet {
 
 interface Assistant {
 	@SystemMessage("""
-		From now on, you're in the role of an advanced open-source AI coding assistant called JAgent.
+		From now on, you're in the role of an advanced open-source AI coding assistant called JAgent that runs in the terminal.
 		If the user asks where the repository is, say: https://github.com/machineswillrise/jagent
 		Don't mention the repository in normal conversation unless the user specifically asks.
 
-		If the user asks for information about you, say that you're powered by Mistral models, written in Java and run in the terminal.
 		Explain your work in a few short sentences in a way that would make sense to a non-technical user.
 		Keep most of your responses only a few sentences long and only use Markdown if you absolutely need to.
 
@@ -505,14 +506,27 @@ class JAgent {
 			.create();
 	}
 
-	private static MistralAiStreamingChatModel initModel(String apiKey) {
-		return MistralAiStreamingChatModel.builder()
-			.apiKey(apiKey)
-			.modelName(MistralAiChatModelName.MISTRAL_LARGE_LATEST)
-			// sometimes it takes a while to generate documents and
-			// it throws a HttpTimeoutException
-			.timeout(Duration.ofSeconds(90))
-			.build();
+	private static StreamingChatModel initModel(Options options) {
+		StreamingChatModel model;
+		int timeout = 90; // generating libreoffice documents can take a long time
+
+		if (options.MISTRAL_API_KEY == null) {
+			var opencodeBearer = Map.of("Authorization", "Bearer public");
+			model = OpenAiStreamingChatModel.builder()
+				.baseUrl("https://opencode.ai/zen/v1")
+				.modelName("big-pickle") // this one is free
+				.customHeaders(opencodeBearer)
+				.timeout(Duration.ofSeconds(timeout))
+				.build();
+		} else {
+			model = MistralAiStreamingChatModel.builder()
+				.apiKey(options.MISTRAL_API_KEY)
+				.modelName(MistralAiChatModelName.MISTRAL_LARGE_LATEST)
+				.timeout(Duration.ofSeconds(timeout))
+				.build();
+		}
+
+		return model;
 	}
 
 	private static ChatMemoryProvider initMemory(int max) {
@@ -603,12 +617,6 @@ class JAgent {
 		}
 
 		return options;
-	}
-
-	private static void validateApiKey(String apiKey) {
-		if (apiKey == null) {
-			logAndExit("Please add an API key (--api-key).", true);
-		}
 	}
 
 	private static boolean isTooSmall() {
@@ -753,11 +761,7 @@ class JAgent {
 			}
 
 			var browser = initBrowser();
-
-			var apiKey = options.MISTRAL_API_KEY;
-			validateApiKey(apiKey);
-
-			var model = initModel(apiKey);
+			var model = initModel(options);
 			var memory = initMemory(200);
 			var agent = initAgent(model, memory, browser, options.DISABLE_PERMISSION_CHECKS, scanner);
 
