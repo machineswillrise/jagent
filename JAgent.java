@@ -282,17 +282,17 @@ class ShellCommandTools extends ToolSet {
 	}
 
 	@Tool("Initialize a Git repository.")
-	public void initRepo(String origin, boolean woke) throws IOException {
+	public void initRepo(String origin, boolean renameToMain) throws IOException {
 		if (!confirmAction("initRepo", "Initialize git repository with origin: " + origin)) {
 			return;
 		}
 
 		LOG.info("Initializing git repository with origin {} and branch {}",
-			origin, woke ? "main" : "master");
+			origin, renameToMain ? "main" : "master");
 		execShellCmd("git", "init");
 		execShellCmd("git", "remote", "add", "origin", origin);
 
-		if (!woke) {
+		if (!renameToMain) {
 			return;
 		}
 
