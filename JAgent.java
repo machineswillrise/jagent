@@ -98,6 +98,10 @@ class Options {
 	@Option(names = {"-p", "--prompt"}, description = "The prompt to use for the AI.", arity = "1")
 	public transient String PROMPT;
 
+	// this avoids duplicating the response twice when scraping stdout 
+	@Option(names = {"-r", "--raw-markdown"}, description = "Output raw Markdown without formatting.")
+	public transient boolean RAW_MARKDOWN = false;
+
 	@Option(names = {"-f", "--files"}, description = "List of files to work on.", arity = "1..*")
 	public transient File[] FILES;
 }
@@ -508,11 +512,11 @@ class JAgent {
 			.create();
 	}
 
-	private static StreamingChatModel initModel(Options options) {
+	private static StreamingChatModel initModel(String mistralApiKey) {
 		StreamingChatModel model;
 		int timeout = 90; // generating libreoffice documents can take a long time
 
-		if (options.MISTRAL_API_KEY == null) {
+		if (mistralApiKey == null) {
 			var opencodeBearer = Map.of("Authorization", "Bearer public");
 			model = OpenAiStreamingChatModel.builder()
 				.baseUrl("https://opencode.ai/zen/v1")
@@ -522,7 +526,7 @@ class JAgent {
 				.build();
 		} else {
 			model = MistralAiStreamingChatModel.builder()
-				.apiKey(options.MISTRAL_API_KEY)
+				.apiKey(mistralApiKey)
 				.modelName(MistralAiChatModelName.MISTRAL_LARGE_LATEST)
 				.timeout(Duration.ofSeconds(timeout))
 				.build();
@@ -677,7 +681,7 @@ class JAgent {
 		System.out.println(markdown(md));
 	}
 
-	private static void streamResponse(TokenStream tokenStream, Runnable onComplete)
+	private static void streamResponse(TokenStream tokenStream, Runnable onComplete, boolean rawMarkdown)
 		throws InterruptedException {
 		var futureResponse = new CompletableFuture<Void>();
 		var fullResponse = new StringBuilder();
@@ -688,8 +692,10 @@ class JAgent {
 				fullResponse.append(partialResponse);
 			})
 			.onCompleteResponse(response -> {
-				System.out.print(CLEAR_SCREEN);
-				prettyPrint(fullResponse.toString());
+				if (!rawMarkdown) {
+					System.out.print(CLEAR_SCREEN);
+					prettyPrint(fullResponse.toString());
+				}
 
 				onComplete.run();
 				futureResponse.complete(null);
@@ -707,7 +713,7 @@ class JAgent {
 		}
 	}
 
-	private static void handleOneShot(Assistant agent, String sessionId, String prompt,
+	private static void handleOneShot(Assistant agent, String sessionId, boolean rawMarkdown, String prompt,
 		String fileContext, WebDriver browser) throws InterruptedException {
 		var message = fileContext.isEmpty() ? prompt : fileContext + prompt;
 		var tokenStream = agent.chat(sessionId, message);
@@ -715,8 +721,8 @@ class JAgent {
 		streamResponse(tokenStream,
 			() -> {
 				browser.quit();
-				logAndExit("Exiting...", true);
-			});
+				System.exit(0);
+			}, rawMarkdown);
 	}
 
 	private static void displayBoxedMessage(String message) {
@@ -728,13 +734,13 @@ class JAgent {
 	}
 
 	private static void runInteractiveLoop(ScanningUtil scanningUtil, WebDriver browser,
-		Assistant agent, String sessionId, String fileContext) throws InterruptedException {
+		Assistant agent, String sessionId, String fileContext, boolean rawMarkdown) throws InterruptedException {
 		while (true) {
 			var message = scanningUtil.scan("jagent > ");
 			switch (message) {
 				case "/exit" -> {
 					browser.quit();
-					logAndExit("Exiting...", true);
+					System.exit(0);
 				}
 				case "/clear" -> System.out.print(CLEAR_SCREEN);
 				case "" -> System.out.println("Please enter a message.");
@@ -742,7 +748,7 @@ class JAgent {
 					var fullMessage = fileContext.isEmpty() ? message : fileContext + message;
 					var tokenStream = agent.chat(sessionId, fullMessage);
 
-					streamResponse(tokenStream, () -> {});
+					streamResponse(tokenStream, () -> {}, rawMarkdown);
 				}
 			}
 		}
@@ -763,7 +769,7 @@ class JAgent {
 			}
 
 			var browser = initBrowser();
-			var model = initModel(options);
+			var model = initModel(options.MISTRAL_API_KEY);
 			var memory = initMemory(200);
 			var agent = initAgent(model, memory, browser, options.DISABLE_PERMISSION_CHECKS, scanner);
 
@@ -772,12 +778,12 @@ class JAgent {
 
 			// oneshot mode
 			if (options.PROMPT != null) {
-				handleOneShot(agent, sessionId, options.PROMPT, fileContext, browser);
+				handleOneShot(agent, sessionId, options.RAW_MARKDOWN, options.PROMPT, fileContext, browser);
 			}
 
 			// interactive mode
 			displayBoxedMessage("Welcome to JAgent!");
-			runInteractiveLoop(scanningUtil, browser, agent, sessionId, fileContext);
+			runInteractiveLoop(scanningUtil, browser, agent, sessionId, fileContext, options.RAW_MARKDOWN);
 		} catch (Exception e) {
 			System.err.println(e.getMessage());
 		}
