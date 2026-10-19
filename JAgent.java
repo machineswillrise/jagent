@@ -6,6 +6,7 @@
 //DEPS dev.langchain4j:langchain4j-open-ai:1.22.0
 //DEPS info.picocli:picocli:4.7.7
 //DEPS io.jstach.rainbowgum:rainbowgum:0.15.1
+//DEPS org.jline:jline:4.4.8
 //DEPS org.seleniumhq.selenium:selenium-java:4.51.0
 //DEPS org.slf4j:slf4j-api:2.0.20
 
@@ -33,7 +34,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Scanner;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -57,6 +57,10 @@ import dev.langchain4j.service.MemoryId;
 import dev.langchain4j.service.SystemMessage;
 import dev.langchain4j.service.TokenStream;
 import dev.langchain4j.service.UserMessage;
+
+import org.jline.reader.LineReader;
+import org.jline.reader.LineReaderBuilder;
+import org.jline.terminal.TerminalBuilder;
 
 import org.openqa.selenium.By;
 import org.openqa.selenium.firefox.FirefoxDriver;
@@ -102,22 +106,22 @@ class Options {
 
 abstract class ToolSet {
 	protected final boolean disablePermissionChecks;
+	protected final LineReader lineReader;
 
-	public ToolSet(boolean disablePermissionChecks) {
+	public ToolSet(boolean disablePermissionChecks, LineReader lineReader) {
 		this.disablePermissionChecks = disablePermissionChecks;
+		this.lineReader = lineReader;
 	}
 
 	protected boolean confirmAction(String toolName, String description) {
-		String response;
-
 		if (disablePermissionChecks) {
 			return true;
 		}
 
-		try (Scanner scanner = new Scanner(System.in)) {
-			System.out.printf("[CONFIRM] %s: %s (y/n)? ", toolName, description);
-			response = scanner.nextLine().trim().toLowerCase();
-		}
+		var response = lineReader
+			.readLine("[CONFIRM] %s: %s (y/n)? ".formatted(toolName, description))
+			.trim()
+			.toLowerCase();
 
 		return response.equals("y") || response.equals("yes");
 	}
@@ -142,8 +146,8 @@ class FileBrowsingTools extends ToolSet {
 		".go-build"
 	);
 
-	public FileBrowsingTools(boolean disablePermissionChecks) {
-		super(disablePermissionChecks);
+	public FileBrowsingTools(boolean disablePermissionChecks, LineReader lineReader) {
+		super(disablePermissionChecks, lineReader);
 	}
 
 	@Tool("Get the current working directory.")
@@ -244,8 +248,8 @@ class FileBrowsingTools extends ToolSet {
 class ShellCommandTools extends ToolSet {
 	private static final Logger LOG = LoggerFactory.getLogger(ShellCommandTools.class);
 
-	public ShellCommandTools(boolean disablePermissionChecks) {
-		super(disablePermissionChecks);
+	public ShellCommandTools(boolean disablePermissionChecks, LineReader lineReader) {
+		super(disablePermissionChecks, lineReader);
 	}
 
 	@Tool("Execute a shell command.")
@@ -318,8 +322,8 @@ class WebBrowsingTools extends ToolSet {
 	private final WebDriver driver;
 	private static final Logger LOG = LoggerFactory.getLogger(WebBrowsingTools.class);
 
-	public WebBrowsingTools(boolean disablePermissionChecks, WebDriver driver) {
-		super(disablePermissionChecks);
+	public WebBrowsingTools(boolean disablePermissionChecks, WebDriver driver, LineReader lineReader) {
+		super(disablePermissionChecks, lineReader);
 		this.driver = driver;
 	}
 
@@ -357,21 +361,14 @@ class WebBrowsingTools extends ToolSet {
 }
 
 class MiscTools extends ToolSet {
-	public MiscTools(boolean disablePermissionChecks) {
-		super(disablePermissionChecks);
+	public MiscTools(boolean disablePermissionChecks, LineReader lineReader) {
+		super(disablePermissionChecks, lineReader);
 	}
 
 	@Tool("Ask the user a question.")
 	public String askQuestion(String question) {
-		String answer;
-
-		try (Scanner scanner = new Scanner(System.in)) {
-			System.out.println(question);
-			System.out.print("Enter your answer: ");
-			answer = scanner.nextLine();
-		}
-
-		return answer;
+		System.out.println(question);
+		return lineReader.readLine("Enter your answer: ");
 	}
 }
 
@@ -384,8 +381,8 @@ record LibreOfficeDocument(
 ) {}
 
 class LibreOfficeTools extends ToolSet {
-	public LibreOfficeTools(boolean disablePermissionChecks) {
-		super(disablePermissionChecks);
+	public LibreOfficeTools(boolean disablePermissionChecks, LineReader lineReader) {
+		super(disablePermissionChecks, lineReader);
 	}
 
 	@Tool(
@@ -430,24 +427,6 @@ interface Assistant {
 		"""
 	)
 	TokenStream chat(@MemoryId String chatId, @UserMessage String message);
-}
-
-class ScanningUtil implements AutoCloseable {
-	private final Scanner scanner;
-
-	public ScanningUtil(Scanner scanner) {
-		this.scanner = scanner;
-	}
-
-	public String scan(String output) {
-		System.out.print(output);
-		return scanner.nextLine();
-	}
-
-	@Override
-	public void close() {
-		scanner.close();
-	}
 }
 
 class JAgent {
@@ -497,12 +476,12 @@ class JAgent {
 	}
 
 	private static Assistant initAgent(StreamingChatModel model, ChatMemoryProvider memory,
-		WebDriver browser, boolean disablePermissionChecks, Scanner scanner) {
-		ToolSet fileTools = new FileBrowsingTools(disablePermissionChecks);
-		ToolSet shellTools = new ShellCommandTools(disablePermissionChecks);
-		ToolSet webTools = new WebBrowsingTools(disablePermissionChecks, browser);
-		ToolSet miscTools = new MiscTools(disablePermissionChecks);
-		ToolSet libreOfficeTools = new LibreOfficeTools(disablePermissionChecks);
+		WebDriver browser, boolean disablePermissionChecks, LineReader lineReader) {
+		ToolSet fileTools = new FileBrowsingTools(disablePermissionChecks, lineReader);
+		ToolSet shellTools = new ShellCommandTools(disablePermissionChecks, lineReader);
+		ToolSet webTools = new WebBrowsingTools(disablePermissionChecks, browser, lineReader);
+		ToolSet miscTools = new MiscTools(disablePermissionChecks, lineReader);
+		ToolSet libreOfficeTools = new LibreOfficeTools(disablePermissionChecks, lineReader);
 
 		return AiServices.builder(Assistant.class)
 			.streamingChatModel(model)
@@ -653,14 +632,11 @@ class JAgent {
 	}
 
 	private static void handleOneShot(Assistant agent, String sessionId, boolean rawMarkdown,
-		String prompt, String fileContext, WebDriver browser) throws InterruptedException {
+		String prompt, String fileContext) throws InterruptedException {
 		var message = fileContext.isEmpty() ? prompt : fileContext + prompt;
 		var tokenStream = agent.chat(sessionId, message);
 
-		streamResponse(tokenStream, () -> {
-			browser.quit();
-			System.exit(0);
-		}, rawMarkdown);
+		streamResponse(tokenStream, () -> {}, rawMarkdown);
 	}
 
 	private static void displayBoxedMessage(String message) {
@@ -671,14 +647,13 @@ class JAgent {
 		System.out.println(top + middle + bottom);
 	}
 
-	private static void runInteractiveLoop(ScanningUtil scanningUtil, WebDriver browser,
+	private static void runInteractiveLoop(LineReader lineReader,
 		Assistant agent, String sessionId, String fileContext, boolean rawMarkdown) throws InterruptedException {
 		while (true) {
-			var message = scanningUtil.scan("jagent > ");
+			var message = lineReader.readLine("jagent > ");
 			switch (message) {
 				case "/exit" -> {
-					browser.quit();
-					System.exit(0);
+					return;
 				}
 				case "/clear" -> System.out.print(CLEAR_SCREEN);
 				case "" -> System.out.println("Please enter a message.");
@@ -699,25 +674,27 @@ class JAgent {
 
 		options = loadOrCreateConfig(options, configPath, gson);
 
-		var scanner = new Scanner(System.in);
+		try (var terminal = TerminalBuilder.builder().build()) {
+			var lineReader = LineReaderBuilder.builder().terminal(terminal).build();
 
-		try (var scanningUtil = new ScanningUtil(scanner)) {
 			var browser = initBrowser();
 			var model = initModel(options.MISTRAL_API_KEY);
 			var memory = initMemory(200);
-			var agent = initAgent(model, memory, browser, options.DISABLE_PERMISSION_CHECKS, scanner);
+			var agent = initAgent(model, memory, browser, options.DISABLE_PERMISSION_CHECKS, lineReader);
 
 			var sessionId = UUID.randomUUID().toString();
 			var fileContext = buildFileContext(options.FILES);
 
 			// oneshot mode
 			if (options.PROMPT != null) {
-				handleOneShot(agent, sessionId, options.RAW_MARKDOWN, options.PROMPT, fileContext, browser);
+				handleOneShot(agent, sessionId, options.RAW_MARKDOWN, options.PROMPT, fileContext);
+			} else {
+				// interactive mode
+				displayBoxedMessage("Welcome to JAgent!");
+				runInteractiveLoop(lineReader, agent, sessionId, fileContext, options.RAW_MARKDOWN);
 			}
 
-			// interactive mode
-			displayBoxedMessage("Welcome to JAgent!");
-			runInteractiveLoop(scanningUtil, browser, agent, sessionId, fileContext, options.RAW_MARKDOWN);
+			browser.quit();
 		} catch (Exception e) {
 			System.err.println(e.getMessage());
 		}
