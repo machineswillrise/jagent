@@ -283,7 +283,7 @@ class ShellCommandTools extends ToolSet {
 	}
 
 	@Tool("Initialize a Git repository.")
-	public void initRepo(String origin, boolean renameToMain) throws IOException {
+	public void initRepo(String origin, boolean renameToMaster) throws IOException {
 		if (!confirmAction("initRepo", "Initialize git repository with origin: " + origin)) {
 			return;
 		}
@@ -293,13 +293,13 @@ class ShellCommandTools extends ToolSet {
 		execShellCmd("git", "init");
 		execShellCmd("git", "remote", "add", "origin", origin);
 
-		if (!renameToMain) {
+		if (!renameToMaster) {
 			return;
 		}
 
 		String defaultBranch = execShellCmd("git", "config", "--global", "init.defaultBranch");
 		if (defaultBranch.equals("main")) {
-			execShellCmd("git", "branch", "-m", "master", "main");
+			execShellCmd("git", "branch", "-m", "main", "master");
 		}
 	}
 
