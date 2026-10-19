@@ -573,21 +573,21 @@ class JAgent {
 
 	// https://glaforge.dev/posts/2025/02/27/pretty-print-markdown-on-the-console
 	private static String markdown(String md) {
-		var replacements = new HashMap<String, String>() {{
-			put("\\*\\*(.*?)\\*\\*",            "\u001B[1m$1\u001B[0m");
-			put("\\*(.*?)\\*",                  "\u001B[3m$1\u001B[0m");
-			put("__(.*?)__",                    "\u001B[4m$1\u001B[0m");
-			put("~~(.*?)~~",                    "\u001B[9m$1\u001B[0m");
-			put("(> ?.*)",                      "\u001B[3m\u001B[34m\u001B[1m$1\u001B[22m\u001B[0m");
-			put("([\\d]+\\.|-|\\*) (.*)",       "\u001B[35m\u001B[1m$1\u001B[22m\u001B[0m $2");
-			put("(?s)```(\\w+)?\\n(.*?)\\n```", "\u001B[3m\u001B[1m$1\u001B[22m\u001B[0m\n\u001B[57;107m$2\u001B[0m\n");
-			put("`(.*?)`",                      "\u001B[57;107m$1\u001B[0m");
-			put("(#{1,6}) (.*?)\n",             "\u001B[36m\u001B[1m$1 $2\u001B[22m\u001B[0m\n");
-			put("(.*?\n={2,}\n)",               "\u001B[36m\u001B[1m$1\u001B[22m\u001B[0m\n");
-			put("(.*?\n-{2,}\n)",               "\u001B[36m\u001B[1m$1\u001B[22m\u001B[0m\n");
-			put("!\\[(.*?)]\\((.*?)\\)",        "\u001B[34m$1\u001B[0m (\u001B[34m\u001B[4m$2\u001B[0m)");
-			put("!?\\[(.*?)]\\((.*?)\\)",       "\u001B[34m$1\u001B[0m (\u001B[34m\u001B[4m$2\u001B[0m]");
-		}};
+		var replacements = Map.ofEntries(
+			Map.entry("\\*\\*(.*?)\\*\\*",            "\u001B[1m$1\u001B[0m"),
+			Map.entry("\\*(.*?)\\*",                  "\u001B[3m$1\u001B[0m"),
+			Map.entry("__(.*?)__",                    "\u001B[4m$1\u001B[0m"),
+			Map.entry("~~(.*?)~~",                    "\u001B[9m$1\u001B[0m"),
+			Map.entry("(> ?.*)",                      "\u001B[3m\u001B[34m\u001B[1m$1\u001B[22m\u001B[0m"),
+			Map.entry("([\\d]+\\.|-|\\*) (.*)",       "\u001B[35m\u001B[1m$1\u001B[22m\u001B[0m $2"),
+			Map.entry("(?s)```(\\w+)?\\n(.*?)\\n```", "\u001B[3m\u001B[1m$1\u001B[22m\u001B[0m\n\u001B[57;107m$2\u001B[0m\n"),
+			Map.entry("`(.*?)`",                      "\u001B[57;107m$1\u001B[0m"),
+			Map.entry("(#{1,6}) (.*?)\n",             "\u001B[36m\u001B[1m$1 $2\u001B[22m\u001B[0m\n"),
+			Map.entry("(.*?\n={2,}\n)",               "\u001B[36m\u001B[1m$1\u001B[22m\u001B[0m\n"),
+			Map.entry("(.*?\n-{2,}\n)",               "\u001B[36m\u001B[1m$1\u001B[22m\u001B[0m\n"),
+			Map.entry("!\\[(.*?)]\\((.*?)\\)",        "\u001B[34m$1\u001B[0m (\u001B[34m\u001B[4m$2\u001B[0m)"),
+			Map.entry("!?\\[(.*?)]\\((.*?)\\)",       "\u001B[34m$1\u001B[0m (\u001B[34m\u001B[4m$2\u001B[0m)")
+		);
 
 		for (var entry : replacements.entrySet()) {
 			md = md.replaceAll(entry.getKey(), entry.getValue());
