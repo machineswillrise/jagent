@@ -667,11 +667,10 @@ class JAgent {
 		var message = fileContext.isEmpty() ? prompt : fileContext + prompt;
 		var tokenStream = agent.chat(sessionId, message);
 
-		streamResponse(tokenStream,
-			() -> {
-				browser.quit();
-				System.exit(0);
-			}, rawMarkdown);
+		streamResponse(tokenStream, () -> {
+			browser.quit();
+			System.exit(0);
+		}, rawMarkdown);
 	}
 
 	private static void displayBoxedMessage(String message) {
