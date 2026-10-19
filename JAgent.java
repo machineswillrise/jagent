@@ -60,6 +60,7 @@ import dev.langchain4j.service.UserMessage;
 
 import org.jline.reader.LineReader;
 import org.jline.reader.LineReaderBuilder;
+import org.jline.terminal.Terminal;
 import org.jline.terminal.TerminalBuilder;
 
 import org.openqa.selenium.By;
@@ -68,6 +69,7 @@ import org.openqa.selenium.firefox.FirefoxOptions;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebElement;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -118,7 +120,7 @@ abstract class ToolSet {
 			return true;
 		}
 
-		var response = lineReader
+		String response = lineReader
 			.readLine("[CONFIRM] %s: %s (y/n)? ".formatted(toolName, description))
 			.trim()
 			.toLowerCase();
@@ -135,7 +137,7 @@ class PermissionDeniedException extends RuntimeException {
 
 class FileBrowsingTools extends ToolSet {
 	private static final Logger LOG = LoggerFactory.getLogger(FileBrowsingTools.class);
-	private static final List<String> SECRETS = Arrays.asList(
+	private static final List<String> SECRETS = List.of(
 		".env",
 		".git",
 		"node_modules",
@@ -173,7 +175,7 @@ class FileBrowsingTools extends ToolSet {
 
 	private List<Path> walkFiles(String dir, List<String> ignore) throws IOException {
 		LOG.info("Walking files in {}, ignoring {}", dir, ignore);
-		var result = new ArrayList<Path>();
+		List<Path> result = new ArrayList<>();
 
 		Files.walkFileTree(Path.of(dir), new SimpleFileVisitor<Path>() {
 			@Override
@@ -220,11 +222,11 @@ class FileBrowsingTools extends ToolSet {
 	public String readPartialFile(String file, int offset, int limit) throws IOException {
 		LOG.info("Reading partial file {} with offset {} and limit {}", file, offset, limit);
 		checkPermission(file);
-		try (var raf = new RandomAccessFile(Path.of(file).toFile(), "r")) {
+		try (RandomAccessFile raf = new RandomAccessFile(Path.of(file).toFile(), "r")) {
 			raf.seek(offset);
-			var buf = new byte[limit];
+			byte[] buf = new byte[limit];
 
-			var bytesRead = raf.read(buf);
+			int bytesRead = raf.read(buf);
 			if (bytesRead > 0) {
 				return new String(buf, 0, bytesRead, StandardCharsets.UTF_8);
 			}
@@ -259,7 +261,7 @@ class ShellCommandTools extends ToolSet {
 		}
 
 		LOG.info("Running shell command {}", Arrays.toString(cmd));
-		var process = new ProcessBuilder(cmd)
+		Process process = new ProcessBuilder(cmd)
 			.redirectErrorStream(true)
 			.start();
 
@@ -293,7 +295,7 @@ class ShellCommandTools extends ToolSet {
 			return;
 		}
 
-		var defaultBranch = execShellCmd("git", "config", "--global", "init.defaultBranch");
+		String defaultBranch = execShellCmd("git", "config", "--global", "init.defaultBranch");
 		if (defaultBranch.equals("main")) {
 			execShellCmd("git", "branch", "-m", "master", "main");
 		}
@@ -337,17 +339,17 @@ class WebBrowsingTools extends ToolSet {
 	@Tool("Get the search results for a given query.")
 	public Map<String, String> getSearchResults(String query) {
 		LOG.info("Getting search results for {}", query);
-		var encodedQuery = URLEncoder.encode(query, StandardCharsets.UTF_8);
-		var url = String.format("https://duckduckgo.com/?q=%s", encodedQuery);
+		String encodedQuery = URLEncoder.encode(query, StandardCharsets.UTF_8);
+		String url = String.format("https://duckduckgo.com/?q=%s", encodedQuery);
 
 		driver.get(url);
-		var wait = new WebDriverWait(driver, Duration.ofSeconds(10));
-		var results = wait.until(ExpectedConditions.visibilityOfAllElementsLocatedBy(By.cssSelector(".result__a")));
-		var found = new HashMap<String, String>();
+		WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(10));
+		List<WebElement> results = wait.until(ExpectedConditions.visibilityOfAllElementsLocatedBy(By.cssSelector(".result__a")));
+		HashMap<String, String> found = new HashMap<String, String>();
 
-		for (var result : results) {
-			var title = result.getText();
-			var website = result.getAttribute("href");
+		for (WebElement result : results) {
+			String title = result.getText();
+			String website = result.getAttribute("href");
 			found.put(title, website);
 		}
 
@@ -396,7 +398,7 @@ class LibreOfficeTools extends ToolSet {
 			return;
 		}
 
-		var entries = List.of(
+		List<Map.Entry<String, String>> entries = List.of(
 			Map.entry("content.xml", document.content()),
 			Map.entry("styles.xml", document.styles()),
 			Map.entry("meta.xml", document.meta()),
@@ -404,9 +406,9 @@ class LibreOfficeTools extends ToolSet {
 			Map.entry("META-INF/manifest.xml", document.manifest())
 		);
 
-		try (var zipOut = new ZipOutputStream(new FileOutputStream(path))) {
-			for (var entry : entries) {
-				var zipEntry = new ZipEntry(entry.getKey());
+		try (ZipOutputStream zipOut = new ZipOutputStream(new FileOutputStream(path))) {
+			for (Map.Entry<String, String> entry : entries) {
+				ZipEntry zipEntry = new ZipEntry(entry.getKey());
 				zipOut.putNextEntry(zipEntry);
 				zipOut.write(entry.getValue().getBytes(StandardCharsets.UTF_8));
 				zipOut.closeEntry();
@@ -444,7 +446,7 @@ class JAgent {
 		int timeout = 90; // generating libreoffice documents can take a long time
 
 		if (mistralApiKey == null) {
-			var opencodeBearer = Map.of("Authorization", "Bearer public");
+			Map<String, String> opencodeBearer = Map.of("Authorization", "Bearer public");
 			model = OpenAiStreamingChatModel.builder()
 				.baseUrl("https://opencode.ai/zen/v1")
 				.modelName("big-pickle") // this one is free
@@ -470,7 +472,7 @@ class JAgent {
 	}
 
 	private static WebDriver initBrowser() {
-		var options = new FirefoxOptions();
+		FirefoxOptions options = new FirefoxOptions();
 		options.addArguments("--headless");
 		return new FirefoxDriver(options);
 	}
@@ -500,8 +502,8 @@ class JAgent {
 	}
 
 	private static Options parseOptions(String[] args) {
-		var options = new Options();
-		var cmd = new CommandLine(options);
+		Options options = new Options();
+		CommandLine cmd = new CommandLine(options);
 
 		try {
 			cmd.parseArgs(args);
@@ -521,8 +523,8 @@ class JAgent {
 	}
 
 	private static Path getConfigPath() {
-		var home = System.getProperty("user.home");
-		var dir = Path.of(home, ".config", "jagent");
+		String home = System.getProperty("user.home");
+		Path dir = Path.of(home, ".config", "jagent");
 		return dir.resolve("config.json");
 	}
 
@@ -532,7 +534,7 @@ class JAgent {
 				Files.createDirectories(config.getParent());
 
 				if (Files.notExists(config)) {
-					var json = gson.toJson(options);
+					String json = gson.toJson(options);
 					Files.writeString(config, json);
 				}
 
@@ -541,8 +543,8 @@ class JAgent {
 
 			// load api key from config if not provided
 			if (options.MISTRAL_API_KEY == null && Files.exists(config)) {
-				var json = Files.readString(config);
-				var configOptions = gson.fromJson(json, Options.class);
+				String json = Files.readString(config);
+				Options configOptions = gson.fromJson(json, Options.class);
 				options.MISTRAL_API_KEY = configOptions.MISTRAL_API_KEY;
 			}
 		} catch (IOException e) {
@@ -557,11 +559,11 @@ class JAgent {
 			return "";
 		}
 
-		var fileContext = new StringBuilder();
+		StringBuilder fileContext = new StringBuilder();
 		fileContext.append("The following files have been provided for context:\n\n");
 		for (File file : files) {
 			try {
-				var content = Files.readString(file.toPath());
+				String content = Files.readString(file.toPath());
 				fileContext.append("--- File: ").append(file.getPath()).append(" ---\n");
 				fileContext.append(content).append("\n\n");
 			} catch (IOException e) {
@@ -573,7 +575,7 @@ class JAgent {
 
 	// https://glaforge.dev/posts/2025/02/27/pretty-print-markdown-on-the-console
 	private static String markdown(String md) {
-		var replacements = Map.ofEntries(
+		Map<String, String> replacements = Map.ofEntries(
 			Map.entry("\\*\\*(.*?)\\*\\*",            "\u001B[1m$1\u001B[0m"),
 			Map.entry("\\*(.*?)\\*",                  "\u001B[3m$1\u001B[0m"),
 			Map.entry("__(.*?)__",                    "\u001B[4m$1\u001B[0m"),
@@ -589,7 +591,7 @@ class JAgent {
 			Map.entry("!?\\[(.*?)]\\((.*?)\\)",       "\u001B[34m$1\u001B[0m (\u001B[34m\u001B[4m$2\u001B[0m)")
 		);
 
-		for (var entry : replacements.entrySet()) {
+		for (Map.Entry<String, String> entry : replacements.entrySet()) {
 			md = md.replaceAll(entry.getKey(), entry.getValue());
 		}
 		return md;
@@ -601,8 +603,8 @@ class JAgent {
 
 	private static void streamResponse(TokenStream tokenStream, Runnable onComplete, boolean rawMarkdown)
 		throws InterruptedException {
-		var futureResponse = new CompletableFuture<Void>();
-		var fullResponse = new StringBuilder();
+		CompletableFuture<Void> futureResponse = new CompletableFuture<Void>();
+		StringBuilder fullResponse = new StringBuilder();
 
 		tokenStream
 			.onPartialResponse(partialResponse -> {
@@ -633,8 +635,8 @@ class JAgent {
 
 	private static void handleOneShot(Assistant agent, String sessionId, boolean rawMarkdown,
 		String prompt, String fileContext) throws InterruptedException {
-		var message = fileContext.isEmpty() ? prompt : fileContext + prompt;
-		var tokenStream = agent.chat(sessionId, message);
+		String message = fileContext.isEmpty() ? prompt : fileContext + prompt;
+		TokenStream tokenStream = agent.chat(sessionId, message);
 
 		streamResponse(tokenStream, () -> {}, rawMarkdown);
 	}
@@ -650,7 +652,7 @@ class JAgent {
 	private static void runInteractiveLoop(LineReader lineReader,
 		Assistant agent, String sessionId, String fileContext, boolean rawMarkdown) throws InterruptedException {
 		while (true) {
-			var message = lineReader.readLine("jagent > ");
+			String message = lineReader.readLine("jagent > ");
 			switch (message) {
 				case "/exit" -> {
 					return;
@@ -658,8 +660,8 @@ class JAgent {
 				case "/clear" -> System.out.print(CLEAR_SCREEN);
 				case "" -> System.out.println("Please enter a message.");
 				default -> {
-					var fullMessage = fileContext.isEmpty() ? message : fileContext + message;
-					var tokenStream = agent.chat(sessionId, fullMessage);
+					String fullMessage = fileContext.isEmpty() ? message : fileContext + message;
+					TokenStream tokenStream = agent.chat(sessionId, fullMessage);
 
 					streamResponse(tokenStream, () -> {}, rawMarkdown);
 				}
@@ -668,22 +670,22 @@ class JAgent {
 	}
 
 	public static void main(String[] args) {
-		var options = parseOptions(args);
-		var configPath = getConfigPath();
-		var gson = initGson();
+		Options options = parseOptions(args);
+		Path configPath = getConfigPath();
+		Gson gson = initGson();
 
 		options = loadOrCreateConfig(options, configPath, gson);
 
-		try (var terminal = TerminalBuilder.builder().build()) {
-			var lineReader = LineReaderBuilder.builder().terminal(terminal).build();
+		try (Terminal terminal = TerminalBuilder.builder().build()) {
+			LineReader lineReader = LineReaderBuilder.builder().terminal(terminal).build();
 
-			var browser = initBrowser();
-			var model = initModel(options.MISTRAL_API_KEY);
-			var memory = initMemory(200);
-			var agent = initAgent(model, memory, browser, options.DISABLE_PERMISSION_CHECKS, lineReader);
+			WebDriver browser = initBrowser();
+			StreamingChatModel model = initModel(options.MISTRAL_API_KEY);
+			ChatMemoryProvider memory = initMemory(200);
+			Assistant agent = initAgent(model, memory, browser, options.DISABLE_PERMISSION_CHECKS, lineReader);
 
-			var sessionId = UUID.randomUUID().toString();
-			var fileContext = buildFileContext(options.FILES);
+			String sessionId = UUID.randomUUID().toString();
+			String fileContext = buildFileContext(options.FILES);
 
 			// oneshot mode
 			if (options.PROMPT != null) {
