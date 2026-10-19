@@ -523,8 +523,17 @@ class JAgent {
 	}
 
 	private static Path getConfigPath() {
-		String home = System.getProperty("user.home");
-		Path dir = Path.of(home, ".config", "jagent");
+		String os = System.getProperty("os.name");
+		Path dir;
+
+		if (os.startsWith("Windows")) {
+			dir = Path.of(System.getenv("APPDATA"), "AppData", "Roaming", "jagent");
+		} else if (os.startsWith("Mac")) {
+			dir = Path.of(System.getProperty("user.home"), "Library", "Application Support", "jagent");
+		} else {
+			dir = Path.of(System.getProperty("user.home"), ".config", "jagent");
+		}
+
 		return dir.resolve("config.json");
 	}
 
@@ -594,6 +603,7 @@ class JAgent {
 		for (Map.Entry<String, String> entry : replacements.entrySet()) {
 			md = md.replaceAll(entry.getKey(), entry.getValue());
 		}
+
 		return md;
 	}
 
