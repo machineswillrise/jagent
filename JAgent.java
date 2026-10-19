@@ -102,20 +102,23 @@ class Options {
 
 abstract class ToolSet {
 	protected final boolean disablePermissionChecks;
-	protected final Scanner scanner;
 
-	public ToolSet(boolean disablePermissionChecks, Scanner scanner) {
+	public ToolSet(boolean disablePermissionChecks) {
 		this.disablePermissionChecks = disablePermissionChecks;
-		this.scanner = scanner;
 	}
 
 	protected boolean confirmAction(String toolName, String description) {
+		String response;
+
 		if (disablePermissionChecks) {
 			return true;
 		}
 
-		System.out.printf("[CONFIRM] %s: %s (y/n)? ", toolName, description);
-		var response = scanner.nextLine().trim().toLowerCase();
+		try (Scanner scanner = new Scanner(System.in)) {
+			System.out.printf("[CONFIRM] %s: %s (y/n)? ", toolName, description);
+			response = scanner.nextLine().trim().toLowerCase();
+		}
+
 		return response.equals("y") || response.equals("yes");
 	}
 }
@@ -139,8 +142,8 @@ class FileBrowsingTools extends ToolSet {
 		".go-build"
 	);
 
-	public FileBrowsingTools(boolean disablePermissionChecks, Scanner scanner) {
-		super(disablePermissionChecks, scanner);
+	public FileBrowsingTools(boolean disablePermissionChecks) {
+		super(disablePermissionChecks);
 	}
 
 	@Tool("Get the current working directory.")
@@ -241,8 +244,8 @@ class FileBrowsingTools extends ToolSet {
 class ShellCommandTools extends ToolSet {
 	private static final Logger LOG = LoggerFactory.getLogger(ShellCommandTools.class);
 
-	public ShellCommandTools(boolean disablePermissionChecks, Scanner scanner) {
-		super(disablePermissionChecks, scanner);
+	public ShellCommandTools(boolean disablePermissionChecks) {
+		super(disablePermissionChecks);
 	}
 
 	@Tool("Execute a shell command.")
@@ -315,9 +318,8 @@ class WebBrowsingTools extends ToolSet {
 	private final WebDriver driver;
 	private static final Logger LOG = LoggerFactory.getLogger(WebBrowsingTools.class);
 
-	// the scanner is not actually used here because nothing is dangerous
-	public WebBrowsingTools(WebDriver driver, boolean disablePermissionChecks, Scanner scanner) {
-		super(disablePermissionChecks, scanner);
+	public WebBrowsingTools(boolean disablePermissionChecks, WebDriver driver) {
+		super(disablePermissionChecks);
 		this.driver = driver;
 	}
 
@@ -355,29 +357,43 @@ class WebBrowsingTools extends ToolSet {
 }
 
 class MiscTools extends ToolSet {
-	public MiscTools(boolean disablePermissionChecks, Scanner scanner) {
-		super(disablePermissionChecks, scanner);
+	public MiscTools(boolean disablePermissionChecks) {
+		super(disablePermissionChecks);
 	}
 
 	@Tool("Ask the user a question.")
 	public String askQuestion(String question) {
-		System.out.println(question);
-		System.out.print("Enter your answer: ");
-		return scanner.nextLine();
+		String answer;
+
+		try (Scanner scanner = new Scanner(System.in)) {
+			System.out.println(question);
+			System.out.print("Enter your answer: ");
+			answer = scanner.nextLine();
+		}
+
+		return answer;
 	}
 }
 
-record LibreOfficeDocument(String content, String styles, String meta, String settings, String manifest) {}
+record LibreOfficeDocument(
+	String content,
+	String styles,
+	String meta,
+	String settings,
+	String manifest
+) {}
 
 class LibreOfficeTools extends ToolSet {
-	public LibreOfficeTools(boolean disablePermissionChecks, Scanner scanner) {
-		super(disablePermissionChecks, scanner);
+	public LibreOfficeTools(boolean disablePermissionChecks) {
+		super(disablePermissionChecks);
 	}
 
-	@Tool("""
+	@Tool(
+		"""
 		Generate a LibreOffice document at the specified path.
 		Content, styles, meta, settings, and manifest are XML strings that define the document structure.
-		""")
+		"""
+	)
 	public void generateDocument(LibreOfficeDocument document, String path) throws IOException {
 		if (!confirmAction("generateDocument", "Generate LibreOffice document at " + path)) {
 			return;
@@ -492,11 +508,11 @@ class JAgent {
 
 	private static Assistant initAgent(StreamingChatModel model, ChatMemoryProvider memory,
 		WebDriver browser, boolean disablePermissionChecks, Scanner scanner) {
-		var fileTools = new FileBrowsingTools(disablePermissionChecks, scanner);
-		var shellTools = new ShellCommandTools(disablePermissionChecks, scanner);
-		var webTools = new WebBrowsingTools(browser, disablePermissionChecks, scanner);
-		var miscTools = new MiscTools(disablePermissionChecks, scanner);
-		var libreOfficeTools = new LibreOfficeTools(disablePermissionChecks, scanner);
+		ToolSet fileTools = new FileBrowsingTools(disablePermissionChecks);
+		ToolSet shellTools = new ShellCommandTools(disablePermissionChecks);
+		ToolSet webTools = new WebBrowsingTools(disablePermissionChecks, browser);
+		ToolSet miscTools = new MiscTools(disablePermissionChecks);
+		ToolSet libreOfficeTools = new LibreOfficeTools(disablePermissionChecks);
 
 		return AiServices.builder(Assistant.class)
 			.streamingChatModel(model)
