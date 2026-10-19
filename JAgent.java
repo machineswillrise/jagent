@@ -680,11 +680,9 @@ class JAgent {
 	}
 
 	public static void main(String[] args) {
-		Options options = parseOptions(args);
-		Path configPath = getConfigPath();
-		Gson gson = initGson();
-
-		options = loadOrCreateConfig(options, configPath, gson);
+		var options = parseOptions(args);
+		var gson = initGson();
+		options = loadOrCreateConfig(options, getConfigPath(), gson);
 
 		try (Terminal terminal = TerminalBuilder.builder().build()) {
 			LineReader lineReader = LineReaderBuilder.builder().terminal(terminal).build();
