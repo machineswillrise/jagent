@@ -56,6 +56,8 @@ import dev.langchain4j.service.AiServices;
 import dev.langchain4j.service.MemoryId;
 import dev.langchain4j.service.SystemMessage;
 import dev.langchain4j.service.TokenStream;
+import dev.langchain4j.service.tool.ToolArgumentsErrorHandler;
+import dev.langchain4j.service.tool.ToolExecutionErrorHandler;
 import dev.langchain4j.service.UserMessage;
 
 import org.jline.reader.LineReader;
@@ -321,8 +323,8 @@ class ShellCommandTools extends ToolSet {
 }
 
 class WebBrowsingTools extends ToolSet {
-	private final WebDriver driver;
 	private static final Logger LOG = LoggerFactory.getLogger(WebBrowsingTools.class);
+	private final WebDriver driver;
 
 	public WebBrowsingTools(boolean disablePermissionChecks, WebDriver driver, LineReader lineReader) {
 		super(disablePermissionChecks, lineReader);
@@ -479,16 +481,17 @@ class JAgent {
 
 	private static Assistant initAgent(StreamingChatModel model, ChatMemoryProvider memory,
 		WebDriver browser, boolean disablePermissionChecks, LineReader lineReader) {
-		ToolSet fileTools = new FileBrowsingTools(disablePermissionChecks, lineReader);
-		ToolSet shellTools = new ShellCommandTools(disablePermissionChecks, lineReader);
-		ToolSet webTools = new WebBrowsingTools(disablePermissionChecks, browser, lineReader);
-		ToolSet miscTools = new MiscTools(disablePermissionChecks, lineReader);
-		ToolSet libreOfficeTools = new LibreOfficeTools(disablePermissionChecks, lineReader);
+		var fileTools        = new FileBrowsingTools(disablePermissionChecks, lineReader);
+		var shellTools       = new ShellCommandTools(disablePermissionChecks, lineReader);
+		var webTools         = new WebBrowsingTools(disablePermissionChecks, browser, lineReader);
+		var miscTools        = new MiscTools(disablePermissionChecks, lineReader);
+		var libreOfficeTools = new LibreOfficeTools(disablePermissionChecks, lineReader);
 
 		return AiServices.builder(Assistant.class)
 			.streamingChatModel(model)
 			.chatMemoryProvider(memory)
 			.tools(fileTools, shellTools, webTools, miscTools, libreOfficeTools)
+			.toolExecutionErrorHandler(ToolExecutionErrorHandler.failInvocationUnlessVisibleToLlm())
 			.build();
 	}
 
