@@ -530,7 +530,7 @@ class JAgent {
 		Path dir;
 
 		if (os.startsWith("Windows")) {
-			dir = Path.of(System.getenv("APPDATA"), "AppData", "Roaming", "jagent");
+			dir = Path.of(System.getenv("APPDATA"), "jagent");
 		} else if (os.startsWith("Mac")) {
 			dir = Path.of(System.getProperty("user.home"), "Library", "Application Support", "jagent");
 		} else {
