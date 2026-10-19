@@ -1,13 +1,11 @@
 ///usr/bin/env jbang "$0" "$@" ; exit $?
 //JAVA 21+
-//COMPILE_OPTIONS -parameters
 //DEPS com.google.code.gson:gson:2.14.0
 //DEPS dev.langchain4j:langchain4j:1.14.1
 //DEPS dev.langchain4j:langchain4j-mistral-ai:1.14.1
 //DEPS dev.langchain4j:langchain4j-open-ai:1.14.1
 //DEPS info.picocli:picocli:4.7.7
 //DEPS io.jstach.rainbowgum:rainbowgum:0.8.2
-//DEPS net.java.dev.jna:jna:5.18.1
 //DEPS org.seleniumhq.selenium:selenium-java:4.43.0
 //DEPS org.slf4j:slf4j-api:2.0.17
 
@@ -46,10 +44,6 @@ import java.time.Duration;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-
-import com.sun.jna.Library;
-import com.sun.jna.Native;
-import com.sun.jna.Structure;
 
 import dev.langchain4j.agent.tool.Tool;
 import dev.langchain4j.memory.chat.ChatMemoryProvider;
@@ -432,28 +426,6 @@ interface Assistant {
 	TokenStream chat(@MemoryId String chatId, @UserMessage String message);
 }
 
-// getting the terminal size through jline didn't seem to work properly
-class JNAStuff {
-	public static final long TIOCGWINSZ = 0x5413;
-
-	public static class WinSize extends Structure {
-		public short ws_row;
-		public short ws_col;
-		public short ws_xpixel;
-		public short ws_ypixel;
-
-		@Override
-		protected List<String> getFieldOrder() {
-			return Arrays.asList("ws_row", "ws_col", "ws_xpixel", "ws_ypixel");
-		}
-	}
-
-	public interface CLibrary extends Library {
-		CLibrary INSTANCE = Native.load("c", CLibrary.class);
-		int ioctl(int fd, long request, WinSize winsize);
-	}
-}
-
 class ScanningUtil implements AutoCloseable {
 	private final Scanner scanner;
 
@@ -595,15 +567,6 @@ class JAgent {
 		return options;
 	}
 
-	private static boolean isTooSmall() {
-		var size = new JNAStuff.WinSize();
-		var result = JNAStuff.CLibrary.INSTANCE.ioctl(1, JNAStuff.TIOCGWINSZ, size);
-		if (result == 0 && (size.ws_row < 24 || size.ws_col < 80)) {
-			return true;
-		}
-		return false;
-	}
-
 	private static String buildFileContext(File[] files) {
 		if (files == null || files.length == 0) {
 			return "";
@@ -734,10 +697,6 @@ class JAgent {
 		var scanner = new Scanner(System.in);
 
 		try (var scanningUtil = new ScanningUtil(scanner)) {
-			if (isTooSmall()) {
-				displayBoxedMessage("Warning: Your terminal may be too small.");
-			}
-
 			var browser = initBrowser();
 			var model = initModel(options.MISTRAL_API_KEY);
 			var memory = initMemory(200);
