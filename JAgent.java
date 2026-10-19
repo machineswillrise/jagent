@@ -662,8 +662,8 @@ class JAgent {
 		}
 	}
 
-	private static void handleOneShot(Assistant agent, String sessionId, boolean rawMarkdown, String prompt,
-		String fileContext, WebDriver browser) throws InterruptedException {
+	private static void handleOneShot(Assistant agent, String sessionId, boolean rawMarkdown,
+		String prompt, String fileContext, WebDriver browser) throws InterruptedException {
 		var message = fileContext.isEmpty() ? prompt : fileContext + prompt;
 		var tokenStream = agent.chat(sessionId, message);
 
