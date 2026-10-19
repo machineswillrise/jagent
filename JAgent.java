@@ -1,13 +1,13 @@
 ///usr/bin/env jbang "$0" "$@" ; exit $?
 //JAVA 21+
 //DEPS com.google.code.gson:gson:2.14.0
-//DEPS dev.langchain4j:langchain4j:1.14.1
-//DEPS dev.langchain4j:langchain4j-mistral-ai:1.14.1
-//DEPS dev.langchain4j:langchain4j-open-ai:1.14.1
+//DEPS dev.langchain4j:langchain4j:1.22.0
+//DEPS dev.langchain4j:langchain4j-mistral-ai:1.22.0
+//DEPS dev.langchain4j:langchain4j-open-ai:1.22.0
 //DEPS info.picocli:picocli:4.7.7
-//DEPS io.jstach.rainbowgum:rainbowgum:0.8.2
-//DEPS org.seleniumhq.selenium:selenium-java:4.43.0
-//DEPS org.slf4j:slf4j-api:2.0.17
+//DEPS io.jstach.rainbowgum:rainbowgum:0.15.1
+//DEPS org.seleniumhq.selenium:selenium-java:4.51.0
+//DEPS org.slf4j:slf4j-api:2.0.20
 
 import java.io.File;
 import java.io.FileOutputStream;
