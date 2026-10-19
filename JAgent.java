@@ -292,7 +292,7 @@ class ShellCommandTools extends ToolSet {
 		}
 
 		LOG.info("Initializing git repository with origin {} and branch {}",
-			origin, renameToMaster ? "main" : "master");
+			origin, renameToMaster ? "master" : "main");
 		execShellCmd("git", "init");
 		execShellCmd("git", "remote", "add", "origin", origin);
 
@@ -301,7 +301,7 @@ class ShellCommandTools extends ToolSet {
 		}
 
 		String defaultBranch = execShellCmd("git", "config", "--global", "init.defaultBranch");
-		if (defaultBranch.equals("main")) {
+		if (defaultBranch.equals("main") || defaultBranch == null) {
 			execShellCmd("git", "branch", "-m", "main", "master");
 		}
 	}
