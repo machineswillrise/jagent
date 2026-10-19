@@ -124,9 +124,6 @@ abstract class ToolSet {
 		var response = scanner.nextLine().trim().toLowerCase();
 		return response.equals("y") || response.equals("yes");
 	}
-
-	@Tool("Get the name of the current tool set that the agent can use.")
-	public abstract String getToolSetName();
 }
 
 class PermissionDeniedException extends RuntimeException {
@@ -245,11 +242,6 @@ class FileBrowsingTools extends ToolSet {
 		checkPermission(file);
 		Files.writeString(Path.of(file), content);
 	}
-
-	@Override
-	public String getToolSetName() {
-		return "File Browsing Tools";
-	}
 }
 
 class ShellCommandTools extends ToolSet {
@@ -323,11 +315,6 @@ class ShellCommandTools extends ToolSet {
 		execShellCmd("git", "commit", "-m", msg);
 		execShellCmd("git", "push");
 	}
-
-	@Override
-	public String getToolSetName() {
-		return "Shell Command Tools";
-	}
 }
 
 class WebBrowsingTools extends ToolSet {
@@ -371,11 +358,6 @@ class WebBrowsingTools extends ToolSet {
 		LOG.info("Browser shutting down...");
 		driver.quit();
 	}
-
-	@Override
-	public String getToolSetName() {
-		return "Web Browsing Tools";
-	}
 }
 
 class MiscTools extends ToolSet {
@@ -388,11 +370,6 @@ class MiscTools extends ToolSet {
 		System.out.println(question);
 		System.out.print("Enter your answer: ");
 		return scanner.nextLine();
-	}
-
-	@Override
-	public String getToolSetName() {
-		return "Misc Tools";
 	}
 }
 
@@ -428,11 +405,6 @@ class LibreOfficeTools extends ToolSet {
 				zipOut.closeEntry();
 			}
 		}
-	}
-
-	@Override
-	public String getToolSetName() {
-		return "LibreOffice Tools";
 	}
 }
 
