@@ -32,11 +32,14 @@ import java.util.stream.Collectors;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -289,7 +292,7 @@ class ShellCommandTools extends ToolSet {
 		}
 
 		LOG.info("Initializing git repository with origin {} and branch {}",
-			origin, renameToMain ? "main" : "master");
+			origin, renameToMaster ? "main" : "master");
 		execShellCmd("git", "init");
 		execShellCmd("git", "remote", "add", "origin", origin);
 
@@ -587,20 +590,22 @@ class JAgent {
 
 	// https://glaforge.dev/posts/2025/02/27/pretty-print-markdown-on-the-console
 	private static String markdown(String md) {
-		Map<String, String> replacements = Map.ofEntries(
-			Map.entry("\\*\\*(.*?)\\*\\*",            "\u001B[1m$1\u001B[0m"),
-			Map.entry("\\*(.*?)\\*",                  "\u001B[3m$1\u001B[0m"),
-			Map.entry("__(.*?)__",                    "\u001B[4m$1\u001B[0m"),
-			Map.entry("~~(.*?)~~",                    "\u001B[9m$1\u001B[0m"),
-			Map.entry("(> ?.*)",                      "\u001B[3m\u001B[34m\u001B[1m$1\u001B[22m\u001B[0m"),
-			Map.entry("([\\d]+\\.|-|\\*) (.*)",       "\u001B[35m\u001B[1m$1\u001B[22m\u001B[0m $2"),
-			Map.entry("(?s)```(\\w+)?\\n(.*?)\\n```", "\u001B[3m\u001B[1m$1\u001B[22m\u001B[0m\n\u001B[57;107m$2\u001B[0m\n"),
-			Map.entry("`(.*?)`",                      "\u001B[57;107m$1\u001B[0m"),
-			Map.entry("(#{1,6}) (.*?)\n",             "\u001B[36m\u001B[1m$1 $2\u001B[22m\u001B[0m\n"),
-			Map.entry("(.*?\n={2,}\n)",               "\u001B[36m\u001B[1m$1\u001B[22m\u001B[0m\n"),
-			Map.entry("(.*?\n-{2,}\n)",               "\u001B[36m\u001B[1m$1\u001B[22m\u001B[0m\n"),
-			Map.entry("!\\[(.*?)]\\((.*?)\\)",        "\u001B[34m$1\u001B[0m (\u001B[34m\u001B[4m$2\u001B[0m)"),
-			Map.entry("!?\\[(.*?)]\\((.*?)\\)",       "\u001B[34m$1\u001B[0m (\u001B[34m\u001B[4m$2\u001B[0m)")
+		Map<String, String> replacements = new LinkedHashMap<>(
+			Map.ofEntries(
+				Map.entry("\\*\\*(.*?)\\*\\*",            "\u001B[1m$1\u001B[0m"),
+				Map.entry("\\*(.*?)\\*",                  "\u001B[3m$1\u001B[0m"),
+				Map.entry("__(.*?)__",                    "\u001B[4m$1\u001B[0m"),
+				Map.entry("~~(.*?)~~",                    "\u001B[9m$1\u001B[0m"),
+				Map.entry("(> ?.*)",                      "\u001B[3m\u001B[34m\u001B[1m$1\u001B[22m\u001B[0m"),
+				Map.entry("([\\d]+\\.|-|\\*) (.*)",       "\u001B[35m\u001B[1m$1\u001B[22m\u001B[0m $2"),
+				Map.entry("(?s)```(\\w+)?\\n(.*?)\\n```", "\u001B[3m\u001B[1m$1\u001B[22m\u001B[0m\n\u001B[57;107m$2\u001B[0m\n"),
+				Map.entry("`(.*?)`",                      "\u001B[57;107m$1\u001B[0m"),
+				Map.entry("(#{1,6}) (.*?)\n",             "\u001B[36m\u001B[1m$1 $2\u001B[22m\u001B[0m\n"),
+				Map.entry("(.*?\n={2,}\n)",               "\u001B[36m\u001B[1m$1\u001B[22m\u001B[0m\n"),
+				Map.entry("(.*?\n-{2,}\n)",               "\u001B[36m\u001B[1m$1\u001B[22m\u001B[0m\n"),
+				Map.entry("!\\[(.*?)]\\((.*?)\\)",        "\u001B[34m$1\u001B[0m (\u001B[34m\u001B[4m$2\u001B[0m)"),
+				Map.entry("!?\\[(.*?)]\\((.*?)\\)",       "\u001B[34m$1\u001B[0m (\u001B[34m\u001B[4m$2\u001B[0m)")
+			)
 		);
 
 		for (Map.Entry<String, String> entry : replacements.entrySet()) {
