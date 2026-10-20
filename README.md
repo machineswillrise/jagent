@@ -4,7 +4,7 @@
 
 An interactive AI agent written in Java using LangChain4j. It works similarly to Claude Code, and can manipulate files, run shell commands, browse the internet, work with Git repositories, and even generate LibreOffice documents. It asks you questions as it goes to make sure it keeps working on the right track.
 
-It's completely free to use. To use it, sign up for a free Mistral account and agree to training. You might need to put in a phone number to do the verification.
+It's completely free to use. To use it, sign up for a free Mistral account and agree to training. You might need to put in a phone number to do the verification. JAgent also supports DeepSeek through the OpenCode API if you don't want to authenticate.
 
 JAgent has successfully performed the following tasks:
 	- Finding two buffer overflow vulnerabilities in a Meinberg WWVB receiver driver
